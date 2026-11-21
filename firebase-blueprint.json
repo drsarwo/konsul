@@ -1,0 +1,125 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Authenticated doctor or patient profile.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 150 },
+        "photoURL": { "type": "string", "minLength": 0, "maxLength": 500 },
+        "role": { "type": "string", "enum": ["doctor", "patient"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "email", "photoURL", "role", "createdAt", "updatedAt"]
+    },
+    "Consultation": {
+      "title": "Consultation",
+      "description": "Medical consultation session between Dr. Sarwo and a patient.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 3, "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "inviteCode": { "type": "string", "minLength": 4, "maxLength": 16, "pattern": "^[A-Z0-9\\-]+$" },
+        "doctorEmail": { "type": "string", "format": "email", "minLength": 3, "maxLength": 150 },
+        "doctorName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "patientId": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "patientName": { "type": "string", "minLength": 0, "maxLength": 100 },
+        "patientEmail": { "type": "string", "minLength": 0, "maxLength": 150 },
+        "mode": { "type": "string", "enum": ["chat", "video"] },
+        "status": { "type": "string", "enum": ["waiting", "active", "completed"] },
+        "chiefComplaint": { "type": "string", "minLength": 0, "maxLength": 1000 },
+        "symptomDuration": { "type": "string", "minLength": 0, "maxLength": 100 },
+        "allergies": { "type": "string", "minLength": 0, "maxLength": 300 },
+        "vitalsNote": { "type": "string", "minLength": 0, "maxLength": 200 },
+        "diagnosisNote": { "type": "string", "minLength": 0, "maxLength": 2000 },
+        "prescriptionNote": { "type": "string", "minLength": 0, "maxLength": 2000 },
+        "followUpPlan": { "type": "string", "minLength": 0, "maxLength": 1000 },
+        "lastMessagePreview": { "type": "string", "minLength": 0, "maxLength": 200 },
+        "activeCallId": { "type": "string", "minLength": 0, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id", "inviteCode", "doctorEmail", "doctorName", "patientId",
+        "patientName", "patientEmail", "mode", "status", "chiefComplaint",
+        "symptomDuration", "allergies", "vitalsNote", "diagnosisNote",
+        "prescriptionNote", "followUpPlan", "lastMessagePreview", "activeCallId",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Real-time chat message inside a consultation session.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "senderRole": { "type": "string", "enum": ["doctor", "patient"] },
+        "type": { "type": "string", "enum": ["text", "system", "call_event"] },
+        "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "senderId", "senderName", "senderRole", "type", "text", "createdAt"]
+    },
+    "WebRtcCall": {
+      "title": "WebRtcCall",
+      "description": "WebRTC video/audio call signaling state for a consultation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "callerId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "callerName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "callerRole": { "type": "string", "enum": ["doctor", "patient"] },
+        "status": { "type": "string", "enum": ["ringing", "connected", "ended", "declined"] },
+        "offerSdp": { "type": "string", "minLength": 0, "maxLength": 32000 },
+        "answerSdp": { "type": "string", "minLength": 0, "maxLength": 32000 },
+        "mediaMode": { "type": "string", "enum": ["video", "audio"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "callerId", "callerName", "callerRole", "status", "offerSdp", "answerSdp", "mediaMode", "createdAt", "updatedAt"]
+    },
+    "IceCandidate": {
+      "title": "IceCandidate",
+      "description": "WebRTC ICE candidate for peer connection establishment.",
+      "type": "object",
+      "properties": {
+        "candidate": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "sdpMid": { "type": "string", "minLength": 0, "maxLength": 64 },
+        "sdpMLineIndex": { "type": "number" },
+        "senderId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["candidate", "sdpMid", "sdpMLineIndex", "senderId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles containing role and contact details."
+    },
+    "/consultations/{consultationId}": {
+      "schema": { "$ref": "#/entities/Consultation" },
+      "description": "Medical consultations connecting Dr. Sarwo with patients."
+    },
+    "/consultations/{consultationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Real-time chat messages within a consultation."
+    },
+    "/consultations/{consultationId}/calls/{callId}": {
+      "schema": { "$ref": "#/entities/WebRtcCall" },
+      "description": "WebRTC signaling records for video and audio calls."
+    },
+    "/consultations/{consultationId}/calls/{callId}/offerCandidates/{candidateId}": {
+      "schema": { "$ref": "#/entities/IceCandidate" },
+      "description": "ICE candidates generated by the call initiator."
+    },
+    "/consultations/{consultationId}/calls/{callId}/answerCandidates/{candidateId}": {
+      "schema": { "$ref": "#/entities/IceCandidate" },
+      "description": "ICE candidates generated by the call receiver."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Klinik Sarwo",
+  "description": "Platform konsultasi medis daring dengan web chat real-time dan video call berbasis web untuk dr. Sarwo dan pasien.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

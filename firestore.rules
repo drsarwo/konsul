@@ -1,0 +1,338 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Primitives ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isDoctor() {
+      return isVerified() && request.auth.token.email == 'drsarwo@gmail.com';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'photoURL', 'role', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'role', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 150
+        && data.photoURL is string && data.photoURL.size() <= 500
+        && data.role in ['doctor', 'patient']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidConsultation(data) {
+      return data.keys().hasAll([
+          'id', 'inviteCode', 'doctorEmail', 'doctorName', 'patientId',
+          'patientName', 'patientEmail', 'mode', 'status', 'chiefComplaint',
+          'symptomDuration', 'allergies', 'vitalsNote', 'diagnosisNote',
+          'prescriptionNote', 'followUpPlan', 'lastMessagePreview', 'activeCallId',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'inviteCode', 'doctorEmail', 'doctorName', 'patientId',
+          'patientName', 'patientEmail', 'mode', 'status', 'chiefComplaint',
+          'symptomDuration', 'allergies', 'vitalsNote', 'diagnosisNote',
+          'prescriptionNote', 'followUpPlan', 'lastMessagePreview', 'activeCallId',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id) && data.id.size() >= 3 && data.id.size() <= 64
+        && data.inviteCode is string && data.inviteCode.size() >= 4 && data.inviteCode.size() <= 16 && data.inviteCode.matches('^[A-Z0-9\\-]+$')
+        && data.doctorEmail is string && data.doctorEmail == 'drsarwo@gmail.com'
+        && data.doctorName is string && data.doctorName.size() >= 1 && data.doctorName.size() <= 100
+        && data.patientId is string && data.patientId.size() <= 128
+        && data.patientName is string && data.patientName.size() <= 100
+        && data.patientEmail is string && data.patientEmail.size() <= 150
+        && data.mode in ['chat', 'video']
+        && data.status in ['waiting', 'active', 'completed']
+        && data.chiefComplaint is string && data.chiefComplaint.size() <= 1000
+        && data.symptomDuration is string && data.symptomDuration.size() <= 100
+        && data.allergies is string && data.allergies.size() <= 300
+        && data.vitalsNote is string && data.vitalsNote.size() <= 200
+        && data.diagnosisNote is string && data.diagnosisNote.size() <= 2000
+        && data.prescriptionNote is string && data.prescriptionNote.size() <= 2000
+        && data.followUpPlan is string && data.followUpPlan.size() <= 1000
+        && data.lastMessagePreview is string && data.lastMessagePreview.size() <= 200
+        && data.activeCallId is string && data.activeCallId.size() <= 128
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['id', 'senderId', 'senderName', 'senderRole', 'type', 'text', 'createdAt'])
+        && data.keys().hasOnly(['id', 'senderId', 'senderName', 'senderRole', 'type', 'text', 'createdAt'])
+        && isValidId(data.id)
+        && data.senderId is string && data.senderId == request.auth.uid
+        && data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 100
+        && data.senderRole in ['doctor', 'patient']
+        && ((data.senderRole == 'doctor' && isDoctor()) || (data.senderRole == 'patient' && !isDoctor()))
+        && data.type in ['text', 'system', 'call_event']
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 2000
+        && data.createdAt is timestamp;
+    }
+
+    function isValidWebRtcCall(data) {
+      return data.keys().hasAll([
+          'id', 'callerId', 'callerName', 'callerRole', 'status',
+          'offerSdp', 'answerSdp', 'mediaMode', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'callerId', 'callerName', 'callerRole', 'status',
+          'offerSdp', 'answerSdp', 'mediaMode', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.callerId is string && data.callerId.size() >= 1 && data.callerId.size() <= 128
+        && data.callerName is string && data.callerName.size() >= 1 && data.callerName.size() <= 100
+        && data.callerRole in ['doctor', 'patient']
+        && data.status in ['ringing', 'connected', 'ended', 'declined']
+        && data.offerSdp is string && data.offerSdp.size() <= 32000
+        && data.answerSdp is string && data.answerSdp.size() <= 32000
+        && data.mediaMode in ['video', 'audio']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidIceCandidate(data) {
+      return data.keys().hasAll(['candidate', 'sdpMid', 'sdpMLineIndex', 'senderId', 'createdAt'])
+        && data.keys().hasOnly(['candidate', 'sdpMid', 'sdpMLineIndex', 'senderId', 'createdAt'])
+        && data.candidate is string && data.candidate.size() >= 1 && data.candidate.size() <= 2000
+        && data.sdpMid is string && data.sdpMid.size() <= 64
+        && data.sdpMLineIndex is int && data.sdpMLineIndex >= 0 && data.sdpMLineIndex <= 32
+        && data.senderId is string && data.senderId == request.auth.uid
+        && data.createdAt is timestamp;
+    }
+
+    // Master Gate helper for subcollections
+    function getConsultation(consultationId) {
+      return get(/databases/$(database)/documents/consultations/$(consultationId)).data;
+    }
+
+    function isConsultationParticipant(consultationId) {
+      let c = getConsultation(consultationId);
+      return isDoctor() || (c.patientId != '' && c.patientId == request.auth.uid);
+    }
+
+    // --- Collection Rules ---
+
+    // 1. /users/{userId}
+    match /users/{userId} {
+      allow get: if isVerified() && isValidId(userId) && (isOwner(userId) || isDoctor());
+      allow list: if false;
+      allow create: if isVerified()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUser(incoming())
+        && incoming().uid == userId
+        && incoming().email == request.auth.token.email
+        && (incoming().role == 'patient' || (incoming().role == 'doctor' && isDoctor()))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUser(incoming())
+        && incoming().uid == existing().uid
+        && incoming().role == existing().role
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // 2. /consultations/{consultationId}
+    match /consultations/{consultationId} {
+      allow get: if isVerified()
+        && isValidId(consultationId)
+        && (isDoctor() || resource.data.patientId == request.auth.uid || resource.data.patientId == '');
+      allow list: if isVerified()
+        && (isDoctor() || resource.data.patientId == request.auth.uid);
+      allow create: if isVerified()
+        && isValidId(consultationId)
+        && isValidConsultation(incoming())
+        && incoming().id == consultationId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isDoctor() && incoming().patientId == '' && incoming().status == 'waiting')
+          || (!isDoctor()
+              && incoming().patientId == request.auth.uid
+              && incoming().patientEmail == request.auth.token.email
+              && incoming().status == 'waiting'
+              && incoming().diagnosisNote == ''
+              && incoming().prescriptionNote == ''
+              && incoming().followUpPlan == ''
+              && incoming().activeCallId == '')
+        );
+      allow update: if isVerified()
+        && isValidId(consultationId)
+        && isValidConsultation(incoming())
+        && incoming().id == existing().id
+        && incoming().inviteCode == existing().inviteCode
+        && incoming().doctorEmail == existing().doctorEmail
+        && incoming().doctorName == existing().doctorName
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action A: Doctor updates clinical notes, status, mode, call pointer, preview
+          (isDoctor()
+            && incoming().patientId == existing().patientId
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'mode', 'diagnosisNote', 'prescriptionNote',
+              'followUpPlan', 'lastMessagePreview', 'activeCallId', 'updatedAt'
+            ]))
+          ||
+          // Action B: Patient claims an open invite room (only when not completed)
+          (!isDoctor()
+            && existing().status != 'completed'
+            && existing().patientId == ''
+            && incoming().patientId == request.auth.uid
+            && incoming().patientEmail == request.auth.token.email
+            && incoming().status in ['waiting', 'active']
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'patientId', 'patientName', 'patientEmail', 'chiefComplaint',
+              'symptomDuration', 'allergies', 'vitalsNote', 'mode', 'status', 'updatedAt'
+            ]))
+          ||
+          // Action C: Patient updates their intake, mode, activeCallId, or lastMessagePreview (not completed)
+          (!isDoctor()
+            && existing().status != 'completed'
+            && existing().patientId == request.auth.uid
+            && incoming().patientId == existing().patientId
+            && incoming().status == existing().status
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'patientName', 'chiefComplaint', 'symptomDuration', 'allergies',
+              'vitalsNote', 'mode', 'lastMessagePreview', 'activeCallId', 'updatedAt'
+            ]))
+        );
+      allow delete: if false;
+
+      // 3. /consultations/{consultationId}/messages/{messageId}
+      match /messages/{messageId} {
+        allow get: if isVerified()
+          && isValidId(consultationId)
+          && isValidId(messageId)
+          && isConsultationParticipant(consultationId);
+        allow list: if isVerified()
+          && isValidId(consultationId)
+          && isConsultationParticipant(consultationId);
+        allow create: if isVerified()
+          && isValidId(consultationId)
+          && isValidId(messageId)
+          && isValidMessage(incoming())
+          && incoming().id == messageId
+          && incoming().createdAt == request.time
+          && isConsultationParticipant(consultationId)
+          && (isDoctor() || getConsultation(consultationId).status != 'completed');
+        allow update, delete: if false;
+      }
+
+      // 4. /consultations/{consultationId}/calls/{callId}
+      match /calls/{callId} {
+        allow get: if isVerified()
+          && isValidId(consultationId)
+          && isValidId(callId)
+          && isConsultationParticipant(consultationId);
+        allow list: if isVerified()
+          && isValidId(consultationId)
+          && isConsultationParticipant(consultationId);
+        allow create: if isVerified()
+          && isValidId(consultationId)
+          && isValidId(callId)
+          && isValidWebRtcCall(incoming())
+          && incoming().id == callId
+          && incoming().callerId == request.auth.uid
+          && ((incoming().callerRole == 'doctor' && isDoctor()) || (incoming().callerRole == 'patient' && !isDoctor()))
+          && incoming().status == 'ringing'
+          && incoming().answerSdp == ''
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && isConsultationParticipant(consultationId)
+          && getConsultation(consultationId).status != 'completed';
+        allow update: if isVerified()
+          && isValidId(consultationId)
+          && isValidId(callId)
+          && isValidWebRtcCall(incoming())
+          && incoming().id == existing().id
+          && incoming().callerId == existing().callerId
+          && incoming().callerName == existing().callerName
+          && incoming().callerRole == existing().callerRole
+          && incoming().offerSdp == existing().offerSdp
+          && incoming().mediaMode == existing().mediaMode
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && isConsultationParticipant(consultationId)
+          && existing().status in ['ringing', 'connected']
+          && (
+            // Receiver answers the call
+            (existing().status == 'ringing'
+              && existing().answerSdp == ''
+              && incoming().callerId != request.auth.uid
+              && incoming().status == 'connected'
+              && incoming().answerSdp.size() > 0
+              && incoming().diff(existing()).affectedKeys().hasOnly(['answerSdp', 'status', 'updatedAt']))
+            ||
+            // Either party ends or declines the call
+            (incoming().status in ['ended', 'declined']
+              && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']))
+          );
+        allow delete: if false;
+
+        // 5. ICE candidates
+        match /offerCandidates/{candidateId} {
+          allow get: if isVerified() && isValidId(consultationId) && isValidId(callId) && isValidId(candidateId) && isConsultationParticipant(consultationId);
+          allow list: if isVerified() && isValidId(consultationId) && isValidId(callId) && isConsultationParticipant(consultationId);
+          allow create: if isVerified()
+            && isValidId(consultationId)
+            && isValidId(callId)
+            && isValidId(candidateId)
+            && isValidIceCandidate(incoming())
+            && incoming().createdAt == request.time
+            && isConsultationParticipant(consultationId);
+          allow update, delete: if false;
+        }
+
+        match /answerCandidates/{candidateId} {
+          allow get: if isVerified() && isValidId(consultationId) && isValidId(callId) && isValidId(candidateId) && isConsultationParticipant(consultationId);
+          allow list: if isVerified() && isValidId(consultationId) && isValidId(callId) && isConsultationParticipant(consultationId);
+          allow create: if isVerified()
+            && isValidId(consultationId)
+            && isValidId(callId)
+            && isValidId(candidateId)
+            && isValidIceCandidate(incoming())
+            && incoming().createdAt == request.time
+            && isConsultationParticipant(consultationId);
+          allow update, delete: if false;
+        }
+      }
+    }
+  }
+}
